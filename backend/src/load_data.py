@@ -68,7 +68,7 @@ def main() -> int:
     wells_3071 = wells.to_crs(epsg=ANALYSIS_EPSG)
     tracts_3071 = tracts.to_crs(epsg=ANALYSIS_EPSG)
 
-    # 6) Print after summaries (bounds should now be in meters)
+    # 6) Print after summaries 
     print_summary(wells_3071, "WELLS (after reprojection to EPSG:3071)")
     print_summary(tracts_3071, "TRACTS (after reprojection to EPSG:3071)")
     print("\nReprojection: OK (units should now be meters)")
