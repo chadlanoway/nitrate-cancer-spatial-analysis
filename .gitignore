@@ -1,0 +1,25 @@
+# Python virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Backend generated data
+backend/cache/
+backend/data/*
+!backend/data/README.md
+
+# Frontend build output
+web/dist/
+node_modules/
+
+# GIS outputs
+*.tif
+*.tiff
+*.png
+*.vrt
+
+# OS junk
+.DS_Store
+Thumbs.db

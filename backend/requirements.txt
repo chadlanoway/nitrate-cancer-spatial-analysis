@@ -1,0 +1,9 @@
+flask
+flask-cors
+geopandas
+numpy
+scipy
+rasterio
+statsmodels
+shapely
+pyproj
