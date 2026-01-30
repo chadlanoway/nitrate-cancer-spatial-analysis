@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import subprocess
+from filelock import FileLock
+import os, sys, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,15 +34,24 @@ def regression_json_path(k: float, cell: float, knn: int) -> Path:
 def run_idw(k: float, cell: float, knn: int) -> Path:
     out = idw_raster_path(k, cell, knn)
     out.parent.mkdir(parents=True, exist_ok=True)
-    if out.exists():
-        return out
-    subprocess.check_call(
-        ["python", str(IDW_SCRIPT), "--k", str(k), "--cell", str(cell), "--knn", str(knn)]
-    )
-    if not out.exists():
-        raise FileNotFoundError(f"IDW output missing after run: {out}")
-    return out
 
+    lock = FileLock(str(out) + ".lock")
+    with lock:
+        # another request may have generated
+        if out.exists() and out.stat().st_size > 0:
+            return out
+
+        tmp = out.with_suffix(out.suffix + ".tmp")
+
+        # ask the script to write to tmp, then rename
+        subprocess.check_call([
+            sys.executable, str(IDW_SCRIPT),
+            "--k", str(k), "--cell", str(cell), "--knn", str(knn),
+            "--out", str(tmp)
+        ])
+
+        os.replace(tmp, out)   # atomic
+        return out
 
 def run_table(k: float, cell: float, knn: int) -> Path:
     out = tract_table_csv_path(k, cell, knn)
@@ -49,12 +59,11 @@ def run_table(k: float, cell: float, knn: int) -> Path:
     if out.exists():
         return out
     subprocess.check_call(
-        ["python", str(TABLE_SCRIPT), "--k", str(k), "--cell", str(cell), "--knn", str(knn)]
+        [sys.executable, str(TABLE_SCRIPT), "--k", str(k), "--cell", str(cell), "--knn", str(knn)]
     )
     if not out.exists():
         raise FileNotFoundError(f"Table output missing after run: {out}")
     return out
-
 
 def run_regression(k: float, cell: float, knn: int) -> Path:
     out = regression_json_path(k, cell, knn)
@@ -62,7 +71,7 @@ def run_regression(k: float, cell: float, knn: int) -> Path:
     if out.exists():
         return out
     subprocess.check_call(
-        ["python", str(REG_SCRIPT), "--k", str(k), "--cell", str(cell), "--knn", str(knn)]
+        [sys.executable, str(REG_SCRIPT), "--k", str(k), "--cell", str(cell), "--knn", str(knn)]
     )
     if not out.exists():
         raise FileNotFoundError(f"Regression output missing after run: {out}")
