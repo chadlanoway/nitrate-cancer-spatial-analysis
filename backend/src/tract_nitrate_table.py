@@ -1,10 +1,23 @@
+"""
+TRACT-LEVEL NITRATE AGGREGATION
+------------------------------
+Aggregates the IDW nitrate raster to census tracts by computing
+the mean nitrate value per tract.
+
+Produces:
+- A CSV used for regression analysis
+- (Optionally) a GeoJSON with mean nitrate appended
+
+This script bridges raster analysis and statistical modeling
+"""
+
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 import os
 
-# --- Force GIS libs to use venv PROJ/GDAL data (avoid PostGIS/OSGeo4W conflicts) ---
+# deal with local conflicts
 os.environ.pop("PROJ_LIB", None)
 os.environ.pop("PROJ_DATA", None)
 os.environ.pop("GDAL_DATA", None)
@@ -29,11 +42,8 @@ import numpy as np
 import rasterio
 from rasterio.features import rasterize
 
-
-# ----------------------------
 # Paths + fields
-# ----------------------------
-ROOT = Path(__file__).resolve().parents[2]  # .../project1
+ROOT = Path(__file__).resolve().parents[2]  
 
 TRACTS_SHP = ROOT / "backend" / "data" / "cancer_tracts" / "cancer_tracts.shp"
 
@@ -86,7 +96,10 @@ def main() -> int:
         nitrate = src.read(1).astype(np.float64)  # use float64 for stable sums
 
     # Reproject tracts to the raster grid CRS 
-    tracts = tracts.to_crs(epsg=3071)
+    # For this project, the raster grid is always EPSG:3071
+    tracts = tracts.to_crs("EPSG:3071")
+
+
 
 
     # Map each tract to an integer zone id 

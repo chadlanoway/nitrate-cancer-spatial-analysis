@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.17.0/dist/maplibre-gl.css' />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>web</title>
 </head>
@@ -24,6 +24,45 @@
 
     <div id="stats" class="stats">
       <div><b>Loading…</b></div>
+    </div>
+  </div>
+
+  <!-- Bottom-right info button -->
+  <button id="infoBtn" class="info-btn" type="button" aria-label="Info">
+    <span class="info-icon">i</span>
+  </button>
+
+  <!-- Info modal -->
+  <div id="infoModal" class="info-modal" aria-hidden="true">
+    <div class="info-panel" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+      <button id="infoClose" class="info-close" type="button" aria-label="Close">×</button>
+
+      <div class="info-body">
+        <img src="/img/title.png" alt="Title image">
+        <div id="infoTitle" class="info-title">About this map</div>
+
+
+        <p>
+          This app interpolates point-based nitrate concentrations from well water samples and evaluates their
+          association with
+          census tract level cancer incidence rates using regression analysis. The user selects distance decay exponent
+          (k) to control how quickly the influence of well nitrate measurements decreases with distance when
+          interpolating the nitrate surface.
+          </br>
+
+        </p>
+
+        <p>
+          <b>Front End:</b> <a href="https://maplibre.org/" target="_blank" rel="noopener noreferrer">
+            MapLibre GL JS
+          </a>
+          , Vite, Vanilla JS
+        </p>
+        <p>
+          <b>Back End:</b> Flask, Geopandas, Numpy, Scipy, Rasterio, Statsmodels, Shapely, Pyproj
+
+        </p>
+      </div>
     </div>
   </div>
 

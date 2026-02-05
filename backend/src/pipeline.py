@@ -1,3 +1,16 @@
+"""
+PIPELINE ORCHESTRATOR
+---------------------
+Coordinates the analysis pipeline with caching and file locking.
+
+Responsible for:
+- Determining cache paths
+- Running IDW, tract aggregation, and regression steps only when needed
+- Ensuring concurrent API requests do not recompute the same artifacts
+
+Acts as middleman between Flask endpoints and standalone analysis scripts.
+"""
+
 from __future__ import annotations
 
 from filelock import FileLock
@@ -5,7 +18,7 @@ import os, sys, subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-
+# set paths to scripts
 IDW_SCRIPT = ROOT / "backend" / "src" / "idw_preview.py"
 TABLE_SCRIPT = ROOT / "backend" / "src" / "tract_nitrate_table.py"
 REG_SCRIPT = ROOT / "backend" / "src" / "regression_preview.py"
@@ -14,7 +27,7 @@ CACHE_IDW = ROOT / "backend" / "cache" / "idw"
 CACHE_TABLES = ROOT / "backend" / "cache" / "tables"
 CACHE_RESULTS = ROOT / "backend" / "cache" / "results"
 
-
+# path helpers
 def _k_tag(k: float) -> str:
     return str(k).replace(".", "p")
 
@@ -37,13 +50,13 @@ def run_idw(k: float, cell: float, knn: int) -> Path:
 
     lock = FileLock(str(out) + ".lock")
     with lock:
-        # another request may have generated
+        # another request may have generated. was getting random race conditions previously
         if out.exists() and out.stat().st_size > 0:
             return out
 
         tmp = out.with_suffix(out.suffix + ".tmp")
 
-        # ask the script to write to tmp, then rename
+        # write to tmp, then rename
         subprocess.check_call([
             sys.executable, str(IDW_SCRIPT),
             "--k", str(k), "--cell", str(cell), "--knn", str(knn),
@@ -52,7 +65,7 @@ def run_idw(k: float, cell: float, knn: int) -> Path:
 
         os.replace(tmp, out)   # atomic
         return out
-
+# make the csv of residuals
 def run_table(k: float, cell: float, knn: int) -> Path:
     out = tract_table_csv_path(k, cell, knn)
     out.parent.mkdir(parents=True, exist_ok=True)

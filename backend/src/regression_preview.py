@@ -1,3 +1,16 @@
+"""
+REGRESSION ANALYSIS
+------------------
+Runs a simple bivariate linear regression:
+    canrate ~ mean_nitrate
+
+Uses the tract level nitrate CSV and produces:
+- Regression summary statistics (JSON)
+- Tract level predicted values and residuals (CSV)
+
+Results are used by the frontend for display and mapping.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -32,7 +45,7 @@ def main() -> int:
 
     df = pd.read_csv(csv_path)
 
-    # Expect: GEOID10, canrate, mean_nitrate
+    # Expects GEOID10, canrate, mean_nitrate
     for col in ("canrate", "mean_nitrate"):
         if col not in df.columns:
             raise KeyError(f"Missing column '{col}' in {csv_path}. Columns: {list(df.columns)}")
@@ -54,7 +67,7 @@ def main() -> int:
     p_slope = float(model.pvalues[1])
     n = int(model.nobs)
 
-    # Basic residual diagnostics (for mapping later)
+    # residual diagnostics
     resid = model.resid
     rmse = float(np.sqrt(np.mean(resid**2)))
     mae = float(np.mean(np.abs(resid)))

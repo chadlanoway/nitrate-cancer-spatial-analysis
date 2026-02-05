@@ -1,10 +1,24 @@
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/* Hide info modal content until JS is ready */
+body:not(.ui-booted) .info-modal {
+  display: none !important;
+}
+
 html,
 body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+a,
+a:visited,
+a:hover,
+a:active,
+a:focus {
+  color: #fff;
+  text-decoration: underline;
 }
 
 #map {
@@ -13,16 +27,28 @@ body,
 }
 
 #ui {
-  position: absolute;
-  top: 12px;
-  left: 12px;
+  position: relative;
+  top: 0;
+  left: 0;
   z-index: 10;
-  background: rgba(255, 255, 255, .92);
+  pointer-events: auto;
+  transition: transform 180ms ease, opacity 180ms ease;
+  will-change: transform;
+  background: rgba(0, 0, 0, 0.3) !important;
+  color: #fff;
+
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 10px 0 10px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+
   font: 12px/1.2 sans-serif;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, .18);
   width: 260px;
+  box-shadow:
+    none;
+}
+
+#ui * {
+  color: inherit;
 }
 
 #ui .row {
@@ -36,24 +62,444 @@ body,
   flex: 1;
 }
 
+/* -----------------------------
+   Sliding UI panel wrapper
+------------------------------ */
+
+#ui-wrap {
+  position: absolute;
+  top: 12px;
+  left: 0px;
+  z-index: 11;
+
+  /* make wrapper bigger than the panel */
+  width: 320px;
+  /* panel is 260px, so + space for toggle */
+  height: auto;
+
+  pointer-events: none;
+  /* wrapper itself doesn't block map */
+}
+
+/* Toggle button docked to the RIGHT of the panel */
+#ui-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  pointer-events: auto;
+
+  width: 34px;
+  height: 34px;
+  border-radius: 0 10px 10px 0;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+#ui-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* hamburger icon lines */
+#ui-toggle .bar {
+  width: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 2px;
+  display: block;
+}
+
+#ui-toggle .bar+.bar {
+  margin-top: 3px;
+}
+
+/* When collapsed, panel slides left but toggle stays visible */
+#ui-wrap.is-collapsed #ui {
+  transform: translateX(calc(-100% - 24px));
+  opacity: 0.15;
+}
+
+#ui-wrap.is-collapsed #ui-toggle {
+  left: 0;
+  box-shadow:
+    0 0 0 1px rgba(180, 210, 255, 0.5),
+    0 0 26px rgba(120, 180, 255, 0.45),
+    0 0 60px rgba(120, 180, 255, 0.25);
+}
+
+/* Hide panel content until JS wraps it */
+#ui-wrap:not(.is-ready) #ui {
+  visibility: hidden;
+}
+
+#ui-wrap.is-ready #ui {
+  visibility: visible;
+}
+
 #stats {
   font: 12px/1.3 sans-serif;
 }
 
 #runBtn {
   padding: 6px 10px;
-  border: 1px solid rgba(0, 0, 0, .25);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 8px;
-  background: white;
+  background: transparent;
+  color: #fff;
   cursor: pointer;
+  box-shadow:
+    0 0 0 1px rgba(180, 210, 255, 0.5),
+    0 0 26px rgba(120, 180, 255, 0.45),
+    0 0 60px rgba(120, 180, 255, 0.25) !important;
+}
+
+#runBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 #runBtn:disabled {
-  opacity: .6;
+  opacity: 0.5;
   cursor: default;
 }
 
-#runStatus {
-  margin-left: 8px;
-  opacity: .8;
+/* -----------------------------
+   MapLibre controls 
+------------------------------ */
+
+/* Control container */
+.maplibregl-ctrl-group {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(180, 210, 255, 0.5),
+    0 0 26px rgba(120, 180, 255, 0.45),
+    0 0 60px rgba(120, 180, 255, 0.25) !important;
+}
+
+/* Individual buttons */
+.maplibregl-ctrl-group button {
+  background: transparent !important;
+  border: none;
+  width: 32px;
+  height: 32px;
+}
+
+/* Icon color */
+.maplibregl-ctrl-group button span {
+  filter: invert(1);
+  opacity: 0.9;
+}
+
+/* Hover / active states */
+.maplibregl-ctrl-group button:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.maplibregl-ctrl-group button:active {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.maplibregl-ctrl-group button {
+  width: 28px;
+  height: 28px;
+}
+
+.maplibregl-ctrl-top-right {
+  margin-top: 12px;
+  margin-right: 12px;
+}
+
+/* Legend Pills */
+.legend-pill {
+  margin-top: 6px;
+  width: 170px;
+  max-width: 170px;
+}
+
+.legend-pill-bar {
+  height: 12px;
+  border-radius: 999px;
+  /* pill */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.legend-pill-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+.legend-pill-left,
+.legend-pill-right {
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
+}
+
+/* TOOLTIP (MapLibre) */
+/* Styles the main container of the popup */
+.maplibregl-popup {
+  max-width: 400px;
+  font-family: 'Helvetica Neue', Arial, Helvetica, sans-serif;
+}
+
+/* Styles the content area inside the popup */
+.maplibregl-popup-content {
+  background-color: #000000a8;
+  color: #f8f8f8;
+  padding: 10px 15px;
+  border-radius: 5px;
+  border: 1px solid white;
+}
+
+.maplibregl-popup-tip {
+  border-top-color: #000000;
+}
+
+.maplibregl-popup-close-button {
+  color: #555;
+  font-size: 16px;
+}
+
+/* -----------------------------
+   Bottom-right Info button + modal
+------------------------------ */
+
+.info-btn {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 30;
+  /* above map + ui */
+  pointer-events: auto;
+
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.30);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+  cursor: pointer;
+
+  display: grid;
+  place-items: center;
+
+  box-shadow:
+    0 0 0 1px rgba(180, 210, 255, 0.5),
+    0 0 26px rgba(120, 180, 255, 0.45),
+    0 0 60px rgba(120, 180, 255, 0.25);
+}
+
+.info-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.info-icon {
+  font: 700 16px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  transform: translateY(-1px);
+}
+
+/* overlay */
+.info-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 9999;
+  /* top layer */
+  display: none;
+  pointer-events: none;
+}
+
+.info-modal.is-open {
+  display: block;
+  pointer-events: auto;
+}
+
+/* dim backdrop */
+.info-modal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+/* panel */
+.info-panel {
+  position: absolute;
+  right: 75px;
+  bottom: 56px;
+
+  width: 300px;
+  max-height: min(75vh, 520px);
+  overflow: auto;
+
+  background: rgba(0, 0, 0, 0.30);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+
+  padding: 14px 14px 12px;
+
+  box-shadow:
+    0 0 0 1px rgba(180, 210, 255, 0.5),
+    0 0 26px rgba(120, 180, 255, 0.45),
+    0 0 60px rgba(120, 180, 255, 0.25);
+}
+
+/* title + text */
+.info-title {
+  font: 700 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  margin-bottom: 8px;
+}
+
+.info-body {
+  font: 12px/1.35 sans-serif;
+}
+
+.info-body p {
+  margin: 0 0 10px 0;
+}
+
+/* big close button (top layer, upper right) */
+.info-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+
+  background: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+
+  font: 700 22px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1;
+
+  box-shadow:
+    0 0 0 1px rgba(180, 210, 255, 0.35),
+    0 0 16px rgba(120, 180, 255, 0.30);
+}
+
+.info-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.info-body img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+
+  margin: 6px 0 10px;
+  border-radius: 6px;
+
+  /* optional but recommended for visibility */
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Regression tooltip icon */
+.ui-tip {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.95);
+  font: 700 10px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  cursor: help;
+  user-select: none;
+  vertical-align: text-top;
+  position: relative;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.ui-tip:hover,
+.ui-tip:focus {
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+
+/* Tooltip bubble — RIGHT ANCHORED */
+.ui-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+
+  /* anchor to the right of the icon */
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%) translateX(8px);
+
+  width: 240px;
+  max-width: min(240px, calc(100vw - 32px));
+
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: 12px/1.25 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  white-space: normal;
+  z-index: 9999;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+/* Arrow */
+.ui-tip::before {
+  content: "";
+  position: absolute;
+  left: calc(100% - 1px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(0, 0, 0, 0.82);
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.ui-tip:hover::after,
+.ui-tip:focus::after {
+  opacity: 1;
+  transform: translateY(-50%) translateX(4px);
+}
+
+.ui-tip:hover::before,
+.ui-tip:focus::before {
+  opacity: 1;
+}
+
+/* Optional: tidy regression block spacing */
+.reg-title {
+  margin-bottom: 4px;
+}
+
+.reg-sub {
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.reg-line {
+  margin: 2px 0;
+}
+
+.ui-tip::after {
+  white-space: pre-line;
 }

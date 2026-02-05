@@ -1,3 +1,13 @@
+"""
+WEB READY TRACTS EXPORT
+----------------------
+Converts analysis GeoJSON outputs from the projected CRS (EPSG:3071)
+to geographic coordinates (EPSG:4326) for web mapping.
+
+Strips attributes to only what the frontend needs,
+producing a lightweight GeoJSON served by the API.
+"""
+
 from pathlib import Path
 import geopandas as gpd
 
@@ -13,7 +23,7 @@ if gdf.crs is None:
 
 gdf = gdf.to_crs(epsg=4326)
 
-# Keep only what the web needs (smaller file)
+# Keep only what the frontend needs
 keep = ["GEOID10", "canrate", "mean_nitrate", "geometry"]
 gdf = gdf[keep]
 

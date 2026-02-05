@@ -1,3 +1,14 @@
+"""
+DATA VALIDATION & REPROJECTION CHECK
+-----------------------------------
+Utility script for inspecting and validating raw input datasets.
+
+Verifies required fields, prints spatial summaries,
+and confirms reprojection to the analysis CRS (EPSG:3071).
+
+Used for sanity checks during development, not by the web app.
+"""
+
 from __future__ import annotations
 
 import sys

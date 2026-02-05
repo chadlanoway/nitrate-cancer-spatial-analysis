@@ -1,28 +1,24 @@
+"""
+IDW RASTER GENERATOR
+-------------------
+Computes the full inverse-distance-weighted (IDW) nitrate surface
+from well point data using a projected meter based grid.
+
+Outputs a GeoTIFF raster used for:
+- Visualization on the map
+- Aggregation to census tracts in later steps
+
+This is a fairly computationally intensive step in the pipeline.
+"""
+
 from __future__ import annotations
 import os
 
-
+# issues with system path, i think from osgeo
 os.environ.pop("PROJ_LIB", None)
 os.environ.pop("PROJ_DATA", None)
 os.environ.pop("GDAL_DATA", None)
 
-
-
-try:
-    import pyproj
-    from pyproj.datadir import get_data_dir as _pyproj_data_dir
-    _proj_dir = _pyproj_data_dir()
-    os.environ["PROJ_LIB"] = _proj_dir
-    os.environ["PROJ_DATA"] = _proj_dir
-except Exception:
-    pass
-
-try:
-    import rasterio
-    from rasterio.env import GDALDataFinder
-    os.environ["GDAL_DATA"] = GDALDataFinder().search()
-except Exception:
-    pass
 
 import argparse
 import math
@@ -83,7 +79,7 @@ def idw_block(xy_block: np.ndarray, tree: cKDTree, values: np.ndarray, power: fl
     # Query nearest wells
     dists, idx = tree.query(xy_block, k=knn, workers=-1)
 
-    # Ensure 2D shapes even if knn=1
+    # deal with knn=1. it's hardcoded to 30-something but may make that a user controlled param
     if knn == 1:
         dists = dists[:, None]
         idx = idx[:, None]
@@ -96,7 +92,7 @@ def idw_block(xy_block: np.ndarray, tree: cKDTree, values: np.ndarray, power: fl
         # For rows with a hit, take the first hit value
         out = np.empty((xy_block.shape[0],), dtype=np.float32)
         hit_rows = hit.any(axis=1)
-        out[~hit_rows] = np.nan  # fill later
+        out[~hit_rows] = np.nan 
         # Assign exact values
         first_hit_col = hit[hit_rows].argmax(axis=1)
         out[hit_rows] = neigh_vals[hit_rows, first_hit_col].astype(np.float32)
@@ -147,7 +143,7 @@ def main():
     wells = gpd.read_file(WELLS_SHP)
     tracts = gpd.read_file(TRACTS_SHP)
 
-    # Verify fields exist FIRST
+    # Verify fields exist 
     require_fields(wells, [WELLS_VAL_FIELD], "WELLS")
     require_fields(tracts, [TRACTS_RATE_FIELD, TRACTS_ID_FIELD], "TRACTS")
 
@@ -160,7 +156,7 @@ def main():
     # Reproject to meters
     wells = wells.to_crs(epsg=ANALYSIS_EPSG)
     tracts = tracts.to_crs(epsg=ANALYSIS_EPSG)
-    crs_wkt = tracts.crs.to_wkt()
+    
 
     # Build grid extent from tracts
     minx, miny, maxx, maxy = tracts.total_bounds
@@ -193,7 +189,7 @@ def main():
         "width": ncols,
         "count": 1,
         "dtype": "float32",
-        "crs": crs_wkt,
+        "crs": "EPSG:3071",
         "transform": transform,
         "nodata": nodata,
         "tiled": True,
@@ -234,7 +230,7 @@ def main():
             ys = maxy - (row_idx + 0.5) * args.cell
 
             # Build query points for the block
-            # Meshgrid -> (rr*ncols, 2)
+            # Meshgrid 
             X, Y = np.meshgrid(xs, ys)
             q = np.column_stack([X.ravel(), Y.ravel()])
 

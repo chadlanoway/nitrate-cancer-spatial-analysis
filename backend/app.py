@@ -1,9 +1,20 @@
+"""
+FLASK API SERVER
+----------------
+Serves as the backend API for the web app.
+
+Exposes endpoints that:
+- Generate or retrieve cached IDW rasters
+- Compute tract level nitrate summaries
+- Run regression analysis
+- Serve GeoJSON and PNG to the frontend
+
+This file does not do analysis logic directly.
+it orchestrates cached steps via src/pipeline.py
+"""
+
 import os
 from pyproj.datadir import get_data_dir as _pyproj_data_dir
-
-_proj_dir = _pyproj_data_dir()
-os.environ["PROJ_LIB"] = _proj_dir
-os.environ["PROJ_DATA"] = _proj_dir
 
 import io
 import numpy as np
@@ -30,7 +41,7 @@ def health():
 
 @app.get("/api/regression")
 def api_regression():
-    # query params with defaults
+    # default params for page load
     k = float(request.args.get("k", 2.0))
     cell = float(request.args.get("cell", 500.0))
     knn = int(request.args.get("knn", 32))
@@ -38,7 +49,7 @@ def api_regression():
     if k <= 1:
         return jsonify({"error": "k must be > 1"}), 400
 
-    # ensure artifacts exist (cached)
+    # ensure items exist in cache
     raster = run_idw(k, cell, knn)
     table = run_table(k, cell, knn)
     result = run_regression(k, cell, knn)
@@ -56,10 +67,40 @@ def api_regression():
 
 @app.get("/api/tracts")
 def api_tracts():
-    p = Path(__file__).resolve().parent / "cache" / "web" / "tracts_4326.geojson"
-    return send_file(p, mimetype="application/geo+json")
+    # same as above
+    k = float(request.args.get("k", 2.0))
+    cell = float(request.args.get("cell", 500.0))
+    knn = int(request.args.get("knn", 32))
+    if k <= 1:
+        return jsonify({"error": "k must be > 1"}), 400
 
-from src.pipeline import run_idw 
+    run_idw(k, cell, knn)       
+    run_table(k, cell, knn)
+    run_regression(k, cell, knn)
+
+
+    # base tracts geojson (already has id/canrate/mean nitrate)
+    base_path = Path(__file__).resolve().parent / "cache" / "web" / "tracts_4326.geojson"
+    tracts = json.loads(base_path.read_text(encoding="utf-8"))
+
+    # residuals csv produced by regression_preview.py. used in the tooltip in main
+    k_tag = str(k).replace(".", "p")
+    resid_csv = Path(__file__).resolve().parents[0] / "cache" / "results" / f"tract_residuals_k{k_tag}_cs{int(cell)}m_knn{knn}.csv"
+
+    import pandas as pd
+    df = pd.read_csv(resid_csv, dtype={"GEOID10": str})
+    keep = df[["GEOID10", "pred_canrate", "resid_canrate"]].copy()
+    lut = keep.set_index("GEOID10").to_dict(orient="index")
+
+    for f in tracts.get("features", []):
+        props = f.get("properties") or {}
+        geoid = str(props.get("GEOID10") or "")
+        if geoid in lut:
+            props["pred_canrate"] = float(lut[geoid]["pred_canrate"])
+            props["resid_canrate"] = float(lut[geoid]["resid_canrate"])
+        f["properties"] = props
+
+    return jsonify(tracts)
 
 
 def _idw_path_from_query():
@@ -82,7 +123,7 @@ def api_idw_meta():
     with rasterio.open(tif_path) as src:
         b = src.bounds  # EPSG:3071 meters
 
-    # Force CRS 
+    # Force CRS. This was a huge headache to figure out
     tfm = Transformer.from_crs("EPSG:3071", "EPSG:4326", always_xy=True)
 
 
@@ -127,7 +168,7 @@ def api_idw_png():
     else:
         mask = np.zeros_like(data, dtype=bool)
 
-    # Color ramp (blue -> cyan -> yellow -> red)
+    # Color ramp for nitrate, leaned heavily on chatgtp for help
     # Clamp expected nitrate range 
     vmin, vmax = 0.0, 16.0
     t = (np.clip(data, vmin, vmax) - vmin) / (vmax - vmin + 1e-9)
