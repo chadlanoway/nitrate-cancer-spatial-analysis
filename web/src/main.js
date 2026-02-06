@@ -13,6 +13,8 @@ import './style.css';
 import maplibregl from 'maplibre-gl';
 import { initUiPanel } from './ui-panel.js';
 
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 const blankStyle = {
   version: 8,
   sources: {},
@@ -47,11 +49,11 @@ async function setIdwOverlay(k) {
   const cell = DEFAULTS.cell;
   const knn = DEFAULTS.knn;
   // form the url and cache bust
-  const metaRes = await fetch(`/api/idw_meta?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
+  const metaRes = await fetch(`${API_BASE}/api/idw_meta?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
   if (!metaRes.ok) throw new Error(`idw_meta failed: ${metaRes.status}`);
   const meta = await metaRes.json();
 
-  const url = `${meta.url}&v=${Date.now()}`;
+  const url = `${API_BASE}${meta.url}&v=${Date.now()}`;
 
   if (map.getLayer('idw-raster')) map.removeLayer('idw-raster');
   if (map.getSource('idw')) map.removeSource('idw');
@@ -84,7 +86,7 @@ async function fetchRegression(k) {
   const cell = DEFAULTS.cell;
   const knn = DEFAULTS.knn;
 
-  const r = await fetch(`/api/regression?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
+  const r = await fetch(`${API_BASE}/api/regression?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
   if (!r.ok) throw new Error(`regression failed: ${r.status}`);
   return await r.json();
 }
@@ -182,7 +184,7 @@ map.on('load', async () => {
       const cell = DEFAULTS.cell;
       const knn = DEFAULTS.knn;
 
-      const tractsRes = await fetch(`/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
+      const tractsRes = await fetch(`${API_BASE}/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
       if (!tractsRes.ok) throw new Error(`tracts fetch failed: ${tractsRes.status}`);
       const tracts = await tractsRes.json();
 
@@ -227,7 +229,7 @@ map.on('load', async () => {
 
   // tracts fetch
   const { k, cell, knn } = DEFAULTS;
-  const res = await fetch(`/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
+  const res = await fetch(`${API_BASE}/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`tracts fetch failed: ${res.status}`);
   const tracts = await res.json();
 
