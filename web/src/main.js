@@ -207,7 +207,10 @@ map.on('load', async () => {
   ui.slider.collapse();
   ui.setRunEnabled(false);
   ui.setStatus('computing…');
-  const pub = (p) => new URL(p.replace(/^\//, ''), import.meta.env.BASE_URL).toString();
+
+  const BASE = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/'); // ensure trailing /
+  const pub = (p) => BASE + p.replace(/^\//, '');
+
 
   const WI_MASK_URL = pub('data/wi_mask/wi_mask.geojson');
   const WI_BORDER_URL = pub('data/wi_mask/wi_border.geojson');

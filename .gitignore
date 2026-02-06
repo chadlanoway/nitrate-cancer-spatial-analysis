@@ -17,7 +17,7 @@ node_modules/
 # GIS outputs
 *.tif
 *.tiff
-*.png
+
 *.vrt
 
 # OS junk
