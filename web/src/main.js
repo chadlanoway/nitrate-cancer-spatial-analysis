@@ -207,10 +207,15 @@ map.on('load', async () => {
   ui.slider.collapse();
   ui.setRunEnabled(false);
   ui.setStatus('computing…');
+  const pub = (p) => new URL(p.replace(/^\//, ''), import.meta.env.BASE_URL).toString();
+
+  const WI_MASK_URL = pub('data/wi_mask/wi_mask.geojson');
+  const WI_BORDER_URL = pub('data/wi_mask/wi_border.geojson');
 
   // sources/layers
-  map.addSource('wi-border', { type: 'geojson', data: '/data/wi_mask/wi_border.geojson' });
-  map.addSource('wi-mask', { type: 'geojson', data: '/data/wi_mask/wi_mask.geojson' });
+  map.addSource('wi-mask', { type: 'geojson', data: WI_MASK_URL });
+  map.addSource('wi-border', { type: 'geojson', data: WI_BORDER_URL });
+
 
   map.addLayer({
     id: 'wi-mask-fill',
