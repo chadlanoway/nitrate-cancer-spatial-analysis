@@ -336,6 +336,7 @@ map.on('load', async () => {
   const infoClose = document.getElementById('infoClose');
 
   function openInfo() {
+    infoModal.removeAttribute('hidden');
     infoModal.classList.add('is-open');
     infoModal.setAttribute('aria-hidden', 'false');
   }
@@ -343,6 +344,7 @@ map.on('load', async () => {
   function closeInfo() {
     infoModal.classList.remove('is-open');
     infoModal.setAttribute('aria-hidden', 'true');
+    infoModal.setAttribute('hidden', '');
   }
 
   infoBtn?.addEventListener('click', (e) => {
