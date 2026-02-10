@@ -53,7 +53,7 @@ async function setIdwOverlay(k) {
   if (!metaRes.ok) throw new Error(`idw_meta failed: ${metaRes.status}`);
   const meta = await metaRes.json();
 
-  const url = `${API_BASE}${meta.url}&v=${Date.now()}`;
+  const url = `${API_BASE}${meta.url}`;
 
   if (map.getLayer('idw-raster')) map.removeLayer('idw-raster');
   if (map.getSource('idw')) map.removeSource('idw');

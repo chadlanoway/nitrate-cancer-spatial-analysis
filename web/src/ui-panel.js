@@ -87,18 +87,17 @@ export function initUiPanel({ defaults, onRun, onToggleLayers }) {
                 ]
             })
         );
-        // nitrate legend ramp
+        // nitrate legend ramp 
         document.getElementById('nitrate-row')?.appendChild(
             makeLegendPill({
                 id: 'nitrate',
                 left: '0',
-                right: 'high',
+                right: '16+',
                 stops: [
-                    { p: 0.0, c: '#0d0887' },
-                    { p: 0.25, c: '#6a00a8' },
-                    { p: 0.5, c: '#b12a90' },
-                    { p: 0.75, c: '#e16462' },
-                    { p: 1.0, c: '#fca636' }
+                    { p: 0.0, c: '#0000ff' }, // blue
+                    { p: 0.5, c: '#00ffff' }, // cyan
+                    { p: 0.75, c: '#ffff00' }, // yellow
+                    { p: 1.0, c: '#ff0000' }  // red
                 ]
             })
         );

@@ -162,13 +162,14 @@ def main() -> int:
         k_tag = str(args.k).replace(".", "p")
         out_geojson = out_dir / f"cancer_tracts_with_nitrate_k{k_tag}_cs{int(args.cell)}m_knn{args.knn}.geojson"
 
-    # Write CSV 
+   # Write CSV always
     tracts[[TRACT_ID_FIELD, CANCER_RATE_FIELD, "mean_nitrate"]].to_csv(out_csv, index=False)
     print(f"Wrote CSV: {out_csv}")
 
-    # Write GeoJSON
-    tracts.to_file(out_geojson, driver="GeoJSON")
-    print(f"Wrote GeoJSON: {out_geojson}")
+
+    # Write GeoJSON only if --out-geojson was provided
+    if args.out_geojson.strip():
+        tracts.to_file(out_geojson, driver="GeoJSON")
 
     return 0
 

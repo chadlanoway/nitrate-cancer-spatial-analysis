@@ -24,7 +24,8 @@ if gdf.crs is None:
 gdf = gdf.to_crs(epsg=4326)
 
 # Keep only what the frontend needs
-keep = ["GEOID10", "canrate", "mean_nitrate", "geometry"]
+keep = ["GEOID10", "canrate", "geometry"]
+
 gdf = gdf[keep]
 
 gdf.to_file(OUT, driver="GeoJSON")

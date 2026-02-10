@@ -15,22 +15,28 @@ it orchestrates cached steps via src/pipeline.py
 
 import os
 from pyproj.datadir import get_data_dir as _pyproj_data_dir
-
-import io
-import numpy as np
-import rasterio
-from rasterio.enums import Resampling
-from PIL import Image
-from pyproj import Transformer
-
-
+import pandas as pd
 from flask import Flask, jsonify, send_file, request
 from flask_cors import CORS
-import geopandas as gpd
 from pathlib import Path
 import json
+import math
+from src.pipeline import (
+    ensure_idw_outputs,
+    idw_png_path,
+    idw_meta_path,
+    tract_table_csv_path,
+    regression_json_path,
+)
 
-from src.pipeline import run_idw, run_table, run_regression, idw_raster_path, tract_table_csv_path, regression_json_path
+def _safe_num(x):
+    if x is None:
+        return None
+    try:
+        v = float(x)
+    except Exception:
+        return None
+    return v if math.isfinite(v) else None
 
 app = Flask(__name__)
 CORS(app)
@@ -49,17 +55,16 @@ def api_regression():
     if k <= 1:
         return jsonify({"error": "k must be > 1"}), 400
 
-    # ensure items exist in cache
-    raster = run_idw(k, cell, knn)
-    table = run_table(k, cell, knn)
-    result = run_regression(k, cell, knn)
+    ensure_idw_outputs(k, cell, knn, want_png=False, want_table=True, want_reg=True)
+    result = regression_json_path(k, cell, knn)
+    table = tract_table_csv_path(k, cell, knn)
+
 
     payload = json.loads(Path(result).read_text(encoding="utf-8"))
     payload.update({
         "k": k,
         "cell": cell,
         "knn": knn,
-        "raster_path": str(raster),
         "table_path": str(table),
         "result_path": str(result),
     })
@@ -74,20 +79,19 @@ def api_tracts():
     if k <= 1:
         return jsonify({"error": "k must be > 1"}), 400
 
-    run_idw(k, cell, knn)       
-    run_table(k, cell, knn)
-    run_regression(k, cell, knn)
+    ensure_idw_outputs(k, cell, knn, want_png=False, want_table=True, want_reg=True)
 
-
-    # base tracts geojson (already has id/canrate/mean nitrate)
+    # base tracts geojson (saves space in the cache storing the geom once)
     base_path = Path(__file__).resolve().parent / "cache" / "web" / "tracts_4326.geojson"
     tracts = json.loads(base_path.read_text(encoding="utf-8"))
 
+    table_csv = tract_table_csv_path(k, cell, knn)
+    df_table = pd.read_csv(table_csv, dtype={"GEOID10": str})
+    lut_n = df_table.set_index("GEOID10")["mean_nitrate"].to_dict()
     # residuals csv produced by regression_preview.py. used in the tooltip in main
     k_tag = str(k).replace(".", "p")
     resid_csv = Path(__file__).resolve().parents[0] / "cache" / "results" / f"tract_residuals_k{k_tag}_cs{int(cell)}m_knn{knn}.csv"
 
-    import pandas as pd
     df = pd.read_csv(resid_csv, dtype={"GEOID10": str})
     keep = df[["GEOID10", "pred_canrate", "resid_canrate"]].copy()
     lut = keep.set_index("GEOID10").to_dict(orient="index")
@@ -96,125 +100,56 @@ def api_tracts():
         props = f.get("properties") or {}
         geoid = str(props.get("GEOID10") or "")
         if geoid in lut:
-            props["pred_canrate"] = float(lut[geoid]["pred_canrate"])
-            props["resid_canrate"] = float(lut[geoid]["resid_canrate"])
+            props["pred_canrate"]  = _safe_num(lut[geoid].get("pred_canrate"))
+            props["resid_canrate"] = _safe_num(lut[geoid].get("resid_canrate"))
+
+        if geoid in lut_n:
+            props["mean_nitrate"] = _safe_num(lut_n[geoid])
+
         f["properties"] = props
+
 
     return jsonify(tracts)
 
 
-def _idw_path_from_query():
+def _idw_params_from_query():
     k = float(request.args.get("k", 2.0))
     cell = float(request.args.get("cell", 500.0))
     knn = int(request.args.get("knn", 32))
     if k <= 1:
         return None, (jsonify({"error": "k must be > 1"}), 400)
-    p = run_idw(k, cell, knn)
-    return (k, cell, knn, p), None
+    return (k, cell, knn), None
 
 
 @app.get("/api/idw_meta")
 def api_idw_meta():
-    q, err = _idw_path_from_query()
+    q, err = _idw_params_from_query()
     if err:
         return err
-    k, cell, knn, tif_path = q
+    k, cell, knn = q
 
-    with rasterio.open(tif_path) as src:
-        b = src.bounds  # EPSG:3071 meters
+    max_dim = int(request.args.get("max", 1400))
+    ensure_idw_outputs(k, cell, knn, want_png=True, want_table=False, want_reg=False, max_dim=max_dim)
 
-    # Force CRS. This was a huge headache to figure out
-    tfm = Transformer.from_crs("EPSG:3071", "EPSG:4326", always_xy=True)
-
-
-    tl = tfm.transform(b.left,  b.top)
-    tr = tfm.transform(b.right, b.top)
-    br = tfm.transform(b.right, b.bottom)
-    bl = tfm.transform(b.left,  b.bottom)
-
-    return jsonify({
-        "k": k, "cell": cell, "knn": knn,
-        "url": f"/api/idw.png?k={k}&cell={cell}&knn={knn}",
-        "coordinates": [list(tl), list(tr), list(br), list(bl)],
-    })
-
+    meta_path = idw_meta_path(k, cell, knn)
+    payload = json.loads(meta_path.read_text(encoding="utf-8"))
+    return jsonify(payload)
 
 @app.get("/api/idw.png")
 def api_idw_png():
-    q, err = _idw_path_from_query()
+    q, err = _idw_params_from_query()
     if err:
         return err
-    k, cell, knn, tif_path = q
+    k, cell, knn = q
 
-    # Read + downsample for web speed
-    max_dim = int(request.args.get("max", 1400))  # limit png size
-    with rasterio.open(tif_path) as src:
-        w, h = src.width, src.height
-        scale = min(1.0, max_dim / max(w, h))
-        out_w = max(1, int(w * scale))
-        out_h = max(1, int(h * scale))
+    max_dim = int(request.args.get("max", 1400))
+    ensure_idw_outputs(k, cell, knn, want_png=True, want_table=False, want_reg=False, max_dim=max_dim)
 
-        data = src.read(
-            1,
-            out_shape=(out_h, out_w),
-            resampling=Resampling.bilinear
-        ).astype(np.float32)
+    png_path = idw_png_path(k, cell, knn, max_dim)
+    resp = send_file(png_path, mimetype="image/png", conditional=True)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return resp
 
-        nodata = src.nodata
-
-    # Mask nodata
-    if nodata is not None:
-        mask = (data == nodata)
-    else:
-        mask = np.zeros_like(data, dtype=bool)
-
-    # Color ramp for nitrate, leaned heavily on chatgtp for help
-    # Clamp expected nitrate range 
-    vmin, vmax = 0.0, 16.0
-    t = (np.clip(data, vmin, vmax) - vmin) / (vmax - vmin + 1e-9)
-
-    # piecewise gradient
-    r = np.zeros_like(t)
-    g = np.zeros_like(t)
-    b = np.zeros_like(t)
-
-    # 0..0.5: blue -> cyan
-    m1 = t <= 0.5
-    tt = t[m1] / 0.5
-    r[m1] = 0
-    g[m1] = tt
-    b[m1] = 1
-
-    # 0.5..0.75: cyan -> yellow
-    m2 = (t > 0.5) & (t <= 0.75)
-    tt = (t[m2] - 0.5) / 0.25
-    r[m2] = tt
-    g[m2] = 1
-    b[m2] = 1 - tt
-
-    # 0.75..1: yellow -> red
-    m3 = t > 0.75
-    tt = (t[m3] - 0.75) / 0.25
-    r[m3] = 1
-    g[m3] = 1 - tt
-    b[m3] = 0
-
-    alpha = np.full_like(t, 160, dtype=np.uint8)  # opacity
-    alpha[mask] = 0
-
-    rgba = np.dstack([
-        (r * 255).astype(np.uint8),
-        (g * 255).astype(np.uint8),
-        (b * 255).astype(np.uint8),
-        alpha
-    ])
-
-    img = Image.fromarray(rgba, mode="RGBA")
-    buf = io.BytesIO()
-    img.save(buf, format="PNG", optimize=True)
-    buf.seek(0)
-
-    return send_file(buf, mimetype="image/png")
 
 if __name__ == "__main__":
     app.run(debug=True)
