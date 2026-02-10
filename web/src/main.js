@@ -207,7 +207,8 @@ map.on('load', async () => {
   ui.slider.collapse();
   ui.setRunEnabled(false);
   ui.setStatus('computing…');
-
+  const uiVis = document.getElementById('ui');
+  uiVis.removeAttribute('hidden');
   const BASE = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/'); // ensure trailing /
   const pub = (p) => BASE + p.replace(/^\//, '');
 
