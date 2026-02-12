@@ -259,7 +259,7 @@ function ensureScatterModal() {
       <div id="scatterTitle" class="scatter-title">Scatter: mean nitrate vs canrate</div>
 
       <div class="scatter-canvas-wrap">
-        <canvas id="scatterCanvas" width="720" height="420" style="width:100%; height:auto;"></canvas>
+        <canvas id="scatterCanvas"></canvas>
       </div>
 
       <div style="margin-top:10px; font:12px/1.35 sans-serif; opacity:0.9;">
@@ -329,6 +329,9 @@ function drawScatter() {
   const el = ensureScatterModal();
   const canvas = el.querySelector('#scatterCanvas');
   if (!canvas) return;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
