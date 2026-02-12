@@ -590,7 +590,7 @@ map.on('load', async () => {
     id: 'tracts-residual',
     type: 'fill',
     source: 'tracts',
-    layout: { visibility: 'none' },
+    layout: { visibility: 'visible' },
     paint: {
       'fill-opacity': 0.7,
       'fill-color': buildStepExpr('resid_canrate', resBreaks, resColors)

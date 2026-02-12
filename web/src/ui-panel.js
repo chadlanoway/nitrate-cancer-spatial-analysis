@@ -45,7 +45,7 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) 
     const layerState = {
         showTracts: true,
         showNitrate: true,
-        showResidual: false
+        showResidual: true
     };
 
     function setStatus(text) {
@@ -86,7 +86,11 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) 
 
     <div class="layer-row" id="residual-row">
         <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-            <input id="toggleResidual" type="checkbox" />
+            <input
+            id="toggleResidual"
+            type="checkbox"
+            ${layerState.showResidual ? 'checked' : ''}
+            />
             <span>Residuals</span>
         </label>
     </div>
