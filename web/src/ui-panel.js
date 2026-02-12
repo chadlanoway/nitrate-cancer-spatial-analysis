@@ -9,7 +9,7 @@
  * UI-only: it does not fetch data or manipulate the map directly.
  */
 
-export function initUiPanel({ defaults, onRun, onToggleLayers }) {
+export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) {
     const kSlider = document.getElementById('kSlider');
     const kVal = document.getElementById('kVal');
     const runBtn = document.getElementById('runBtn');
@@ -22,6 +22,20 @@ export function initUiPanel({ defaults, onRun, onToggleLayers }) {
     const uiEl = document.getElementById('ui');
     if (!uiEl) throw new Error('Missing #ui container.');
 
+    // top-right chart link (inside the panel)
+    if (!document.getElementById('scatterLink')) {
+        const a = document.createElement('a');
+        a.id = 'scatterLink';
+        a.href = '#';
+        a.className = 'ui-scatter-link';
+        a.textContent = 'Scatter';
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            onShowScatter?.();
+        });
+        uiEl.appendChild(a);
+    }
+
     const slider = installSlidingWrapper(uiEl);
 
     let selectedK = parseFloat(kSlider.value);
@@ -30,7 +44,8 @@ export function initUiPanel({ defaults, onRun, onToggleLayers }) {
     // default on page load, both layers visible
     const layerState = {
         showTracts: true,
-        showNitrate: true
+        showNitrate: true,
+        showResidual: false
     };
 
     function setStatus(text) {
@@ -69,6 +84,13 @@ export function initUiPanel({ defaults, onRun, onToggleLayers }) {
       </label>
     </div>
 
+    <div class="layer-row" id="residual-row">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+            <input id="toggleResidual" type="checkbox" />
+            <span>Residuals</span>
+        </label>
+    </div>
+
   </div>
 `;
         // cancer legend color ramp
@@ -94,10 +116,25 @@ export function initUiPanel({ defaults, onRun, onToggleLayers }) {
                 left: '0',
                 right: '16+',
                 stops: [
-                    { p: 0.0, c: '#0000ff' }, // blue
-                    { p: 0.5, c: '#00ffff' }, // cyan
-                    { p: 0.75, c: '#ffff00' }, // yellow
-                    { p: 1.0, c: '#ff0000' }  // red
+                    { p: 0.0, c: '#0000ff' },
+                    { p: 0.5, c: '#00ffff' },
+                    { p: 0.75, c: '#ffff00' },
+                    { p: 1.0, c: '#ff0000' }
+                ]
+            })
+        );
+        // residuals legend ramp 
+        document.getElementById('residual-row')?.appendChild(
+            makeLegendPill({
+                id: 'residual',
+                left: 'low',
+                right: 'high',
+                stops: [
+                    { p: 0.0, c: '#2166ac' },
+                    { p: 0.25, c: '#67a9cf' },
+                    { p: 0.5, c: '#f7f7f7' },
+                    { p: 0.75, c: '#f4a582' },
+                    { p: 1.0, c: '#b2182b' }
                 ]
             })
         );
@@ -120,6 +157,18 @@ export function initUiPanel({ defaults, onRun, onToggleLayers }) {
                 .style.display = nitrateCb.checked ? '' : 'none';
             onToggleLayers?.(layerState);
         });
+
+        const residualCb = document.getElementById('toggleResidual');
+
+        residualCb.addEventListener('change', () => {
+            layerState.showResidual = residualCb.checked;
+
+            const leg = document.querySelector('[data-legend-id="residual"]');
+            if (leg) leg.style.display = residualCb.checked ? '' : 'none';
+
+            onToggleLayers?.(layerState);
+        });
+
     }
 
     // initialize UI
@@ -222,3 +271,4 @@ function makeLegendPill({ id, left, right, stops }) {
   `;
     return el;
 }
+

@@ -148,10 +148,10 @@ def main():
     require_fields(tracts, [TRACTS_RATE_FIELD, TRACTS_ID_FIELD], "TRACTS")
 
     # Clamp negatives to 0
-    n_before = len(wells)
-    neg_count = int((wells[WELLS_VAL_FIELD] < 0).sum())
-    wells[WELLS_VAL_FIELD] = wells[WELLS_VAL_FIELD].clip(lower=0)
-    print(f"Clamped nitrate values < 0 to 0: {neg_count} / {n_before} wells")
+    #n_before = len(wells)
+    #neg_count = int((wells[WELLS_VAL_FIELD] < 0).sum())
+    #wells[WELLS_VAL_FIELD] = wells[WELLS_VAL_FIELD].clip(lower=0)
+    #print(f"Clamped nitrate values < 0 to 0: {neg_count} / {n_before} wells")
 
     # Reproject to meters
     wells = wells.to_crs(epsg=ANALYSIS_EPSG)

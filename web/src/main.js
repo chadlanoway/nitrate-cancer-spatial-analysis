@@ -40,10 +40,71 @@ const map = new maplibregl.Map({
 // keeping this for console debug
 window.map = map;
 
+// Info button stuff
+const infoBtn = document.getElementById('infoBtn');
+const infoModal = document.getElementById('infoModal');
+const infoClose = document.getElementById('infoClose');
+
+function openInfo() {
+  infoModal.removeAttribute('hidden');
+  infoModal.classList.add('is-open');
+  infoModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeInfo() {
+  infoModal.classList.remove('is-open');
+  infoModal.setAttribute('aria-hidden', 'true');
+  infoModal.setAttribute('hidden', '');
+}
+
+infoBtn?.addEventListener('click', (e) => {
+  e.preventDefault();
+  openInfo();
+});
+
+infoClose?.addEventListener('click', (e) => {
+  e.preventDefault();
+  closeInfo();
+});
+
+infoModal?.addEventListener('click', (e) => {
+  if (e.target === infoModal) closeInfo();
+});
+
+// Esc closes!
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeInfo();
+});
+
+document.body.classList.add('ui-booted');
+openInfo();
+
 const DEFAULTS = { k: 2.0, cell: 500, knn: 32 };
+let wasPanelCollapsedBeforeScatter = false;
+let uiRef = null;
+let latestTracts = null;
+let latestRegression = null;
 let currentLayerState = { showTracts: true, showNitrate: true };
 function fmt(x, d = 4) { return Number.isFinite(x) ? x.toFixed(d) : ''; }
+function setIdwOpacity(opacity) {
+  if (!map.getLayer('idw-raster')) return;
+  map.setPaintProperty('idw-raster', 'raster-opacity', opacity);
+}
+function enforceLayerOrder() {
+  // bottom → top order
+  const order = [
+    'tracts-fill',
+    'idw-raster',
+    'tracts-residual',
+    'tracts-outline',
+    'wi-mask-fill',
+    'wi-border-line'
+  ];
 
+  for (const id of order) {
+    if (map.getLayer(id)) map.moveLayer(id);
+  }
+}
 // Make the layers
 async function setIdwOverlay(k) {
   const cell = DEFAULTS.cell;
@@ -68,18 +129,14 @@ async function setIdwOverlay(k) {
     id: 'idw-raster',
     type: 'raster',
     source: 'idw',
-    paint: { 'raster-opacity': 0.7 }
+    paint: { 'raster-opacity': 1 }
   });
-  setNitrateVisible(currentLayerState.showNitrate);
+  setIdwOpacity(1);
 
-  // ordering headaches
-  if (map.getLayer('tracts-fill')) map.moveLayer('tracts-fill');
-  if (map.getLayer('tracts-outline')) map.moveLayer('tracts-outline');
-  if (map.getLayer('wi-mask-fill') && map.getLayer('idw-raster')) {
-    map.moveLayer('wi-mask-fill');
-    map.moveLayer('idw-raster', 'wi-mask-fill');
-  }
-  if (map.getLayer('wi-border-line')) map.moveLayer('wi-border-line');
+  setNitrateVisible(currentLayerState.showNitrate);
+  enforceLayerOrder();
+
+
 }
 
 async function fetchRegression(k) {
@@ -136,9 +193,14 @@ function regressionHtml(j, k) {
   `;
 }
 
+function setResidualVisible(visible) {
+  setLayerVisibility('tracts-residual', visible);
+}
+
 function getNumeric(values) {
   return values.map(Number).filter(v => Number.isFinite(v)).sort((a, b) => a - b);
 }
+
 function quantile(sorted, q) {
   if (!sorted.length) return NaN;
   const pos = (sorted.length - 1) * q;
@@ -167,41 +229,247 @@ function setTractsVisible(visible) {
 function setNitrateVisible(visible) {
   setLayerVisibility('idw-raster', visible);
 }
+// Loader stuff
+const globalLoader = document.getElementById('globalLoader');
+
+function showLoader() {
+  globalLoader?.removeAttribute('hidden');
+}
+
+function hideLoader() {
+  globalLoader?.setAttribute('hidden', '');
+}
+showLoader();
+
+// -------- Scatter plot modal --------
+let scatterModalEl = null;
+
+function ensureScatterModal() {
+  if (scatterModalEl) return scatterModalEl;
+
+  const el = document.createElement('div');
+  el.id = 'scatterModal';
+  el.className = 'scatter-modal';
+  el.setAttribute('aria-hidden', 'true');
+  el.setAttribute('hidden', '');
+
+  el.innerHTML = `
+    <div class="scatter-panel" role="dialog" aria-modal="true" aria-labelledby="scatterTitle">
+      <button id="scatterClose" class="info-close" type="button" aria-label="Close">×</button>
+      <div id="scatterTitle" class="scatter-title">Scatter: mean nitrate vs canrate</div>
+
+      <div class="scatter-canvas-wrap">
+        <canvas id="scatterCanvas" width="720" height="420" style="width:100%; height:auto;"></canvas>
+      </div>
+
+      <div style="margin-top:10px; font:12px/1.35 sans-serif; opacity:0.9;">
+        Each point is a census tract. X = mean nitrate, Y = observed canrate.
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(el);
+
+  const closeBtn = el.querySelector('#scatterClose');
+  closeBtn?.addEventListener('click', () => closeScatter());
+
+  // click outside closes
+  el.addEventListener('click', (e) => {
+    if (e.target === el) closeScatter();
+  });
+
+  // ESC closes
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeScatter();
+  });
+
+  scatterModalEl = el;
+  return el;
+}
+
+function openScatter() {
+  const el = ensureScatterModal();
+
+  // remember panel state
+  const wrap = document.getElementById('ui-wrap');
+  wasPanelCollapsedBeforeScatter =
+    wrap?.classList.contains('is-collapsed');
+
+  // collapse panel if not already collapsed
+  if (uiRef && !wasPanelCollapsedBeforeScatter) {
+    uiRef.slider.collapse();
+  }
+
+  el.removeAttribute('hidden');
+  el.classList.add('is-open');
+  el.setAttribute('aria-hidden', 'false');
+  drawScatter();
+}
+
+function closeScatter() {
+  if (!scatterModalEl) return;
+
+  scatterModalEl.classList.remove('is-open');
+  scatterModalEl.setAttribute('aria-hidden', 'true');
+  scatterModalEl.setAttribute('hidden', '');
+
+  // restore panel state
+  if (uiRef && !wasPanelCollapsedBeforeScatter) {
+    uiRef.slider.expand();
+  }
+}
+
+function getInterceptAndSlope(reg) {
+  const slope = reg?.params?.slope ?? reg?.slope;
+  const intercept = reg?.params?.intercept ?? reg?.intercept;
+  return { slope, intercept };
+}
+
+function drawScatter() {
+  const el = ensureScatterModal();
+  const canvas = el.querySelector('#scatterCanvas');
+  if (!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const pts = (latestTracts?.features ?? [])
+    .map(f => ({
+      x: Number(f.properties?.mean_nitrate),
+      y: Number(f.properties?.canrate)
+    }))
+    .filter(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+
+  // nothing to draw
+  if (!pts.length) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = '14px sans-serif';
+    ctx.fillText('No data available to plot.', 20, 30);
+    return;
+  }
+
+  // ranges
+  let xmin = Math.min(...pts.map(p => p.x));
+  let xmax = Math.max(...pts.map(p => p.x));
+  let ymin = Math.min(...pts.map(p => p.y));
+  let ymax = Math.max(...pts.map(p => p.y));
+
+  // pad ranges a bit
+  const xpad = (xmax - xmin) * 0.05 || 1;
+  const ypad = (ymax - ymin) * 0.05 || 1;
+  xmin -= xpad; xmax += xpad;
+  ymin -= ypad; ymax += ypad;
+
+  const W = canvas.width, H = canvas.height;
+  const m = { l: 52, r: 18, t: 18, b: 44 };
+  const px = (x) => m.l + (x - xmin) * (W - m.l - m.r) / (xmax - xmin);
+  const py = (y) => H - m.b - (y - ymin) * (H - m.t - m.b) / (ymax - ymin);
+
+  // clear
+  ctx.clearRect(0, 0, W, H);
+
+  // axes
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(m.l, m.t);
+  ctx.lineTo(m.l, H - m.b);
+  ctx.lineTo(W - m.r, H - m.b);
+  ctx.stroke();
+
+  // labels
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = '12px sans-serif';
+  ctx.fillText('mean_nitrate', W / 2 - 35, H - 16);
+  ctx.save();
+  ctx.translate(14, H / 2 + 35);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('canrate', 0, 0);
+  ctx.restore();
+
+  // points
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  for (const p of pts) {
+    ctx.beginPath();
+    ctx.arc(px(p.x), py(p.y), 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // regression line (prefer backend params; fallback to simple least squares)
+  let { slope, intercept } = getInterceptAndSlope(latestRegression);
+
+  if (!Number.isFinite(slope) || !Number.isFinite(intercept)) {
+    // compute quick OLS from points
+    const n = pts.length;
+    const mx = pts.reduce((s, p) => s + p.x, 0) / n;
+    const my = pts.reduce((s, p) => s + p.y, 0) / n;
+    let num = 0, den = 0;
+    for (const p of pts) {
+      num += (p.x - mx) * (p.y - my);
+      den += (p.x - mx) * (p.x - mx);
+    }
+    slope = den ? num / den : 0;
+    intercept = my - slope * mx;
+  }
+
+  const y1 = slope * xmin + intercept;
+  const y2 = slope * xmax + intercept;
+
+  ctx.strokeStyle = 'rgba(120,180,255,0.95)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(px(xmin), py(y1));
+  ctx.lineTo(px(xmax), py(y2));
+  ctx.stroke();
+}
 
 map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
 map.on('load', async () => {
   const ui = initUiPanel({
+
     defaults: DEFAULTS,
 
     onToggleLayers: (state) => {
       currentLayerState = state;
       setTractsVisible(state.showTracts);
       setNitrateVisible(state.showNitrate);
+      setResidualVisible(state.showResidual);
+      enforceLayerOrder();
     },
 
     onRun: async (k) => {
-      const cell = DEFAULTS.cell;
-      const knn = DEFAULTS.knn;
+      showLoader();
 
-      const tractsRes = await fetch(`${API_BASE}/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
-      if (!tractsRes.ok) throw new Error(`tracts fetch failed: ${tractsRes.status}`);
-      const tracts = await tractsRes.json();
+      try {
+        const cell = DEFAULTS.cell;
+        const knn = DEFAULTS.knn;
 
-      // update map source data in place
-      map.getSource('tracts').setData(tracts);
+        const tractsRes = await fetch(`${API_BASE}/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
+        if (!tractsRes.ok) throw new Error(`tracts fetch failed: ${tractsRes.status}`);
+        const tracts = await tractsRes.json();
 
-      await setIdwOverlay(k);
+        map.getSource('tracts').setData(tracts);
 
-      const reg = await fetchRegression(k);
+        await setIdwOverlay(k);
 
-      // deak with visibility issues after recreates layers
-      setTractsVisible(currentLayerState.showTracts);
-      setNitrateVisible(currentLayerState.showNitrate);
+        const reg = await fetchRegression(k);
+        latestRegression = reg;
+        latestTracts = tracts;
 
-      return regressionHtml(reg, k); // returns HTML string
-    }
+        setTractsVisible(currentLayerState.showTracts);
+        setNitrateVisible(currentLayerState.showNitrate);
+
+        return regressionHtml(reg, k);
+
+      } finally {
+        hideLoader();
+      }
+    },
+    onShowScatter: () => openScatter()
   });
+  uiRef = ui;
 
   // initial run on load
   ui.slider.collapse();
@@ -241,6 +509,7 @@ map.on('load', async () => {
   const res = await fetch(`${API_BASE}/api/tracts?k=${k}&cell=${cell}&knn=${knn}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`tracts fetch failed: ${res.status}`);
   const tracts = await res.json();
+  latestTracts = tracts;
 
   map.addSource('tracts', { type: 'geojson', data: tracts });
 
@@ -293,12 +562,46 @@ map.on('load', async () => {
     }
   });
 
+  // Residual layer (hidden by default)
+  const residuals = getNumeric(
+    tracts.features.map(f => f.properties?.resid_canrate)
+  );
+
+  const q20 = quantile(residuals, 0.20);
+  const q40 = quantile(residuals, 0.40);
+  const q60 = quantile(residuals, 0.60);
+  const q80 = quantile(residuals, 0.80);
+
+  const resBreaks = [q20, q40, q60, q80];
+
+  const resColors = [
+    '#2166ac',  // strong negative
+    '#67a9cf',
+    '#f7f7f7',
+    '#f4a582',
+    '#b2182b'   // strong positive
+  ];
+
+
+  map.addLayer({
+    id: 'tracts-residual',
+    type: 'fill',
+    source: 'tracts',
+    layout: { visibility: 'none' },
+    paint: {
+      'fill-opacity': 0.7,
+      'fill-color': buildStepExpr('resid_canrate', resBreaks, resColors)
+    }
+  });
+
   map.addLayer({
     id: 'tracts-outline',
     type: 'line',
     source: 'tracts',
     paint: { 'line-color': '#000', 'line-opacity': 0.25, 'line-width': 0.5 }
   });
+
+  enforceLayerOrder();
 
   // hover tooltip 
   const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
@@ -331,46 +634,11 @@ map.on('load', async () => {
     popup.remove();
   });
 
-  // Info button stuff
-  const infoBtn = document.getElementById('infoBtn');
-  const infoModal = document.getElementById('infoModal');
-  const infoClose = document.getElementById('infoClose');
-
-  function openInfo() {
-    infoModal.removeAttribute('hidden');
-    infoModal.classList.add('is-open');
-    infoModal.setAttribute('aria-hidden', 'false');
-  }
-
-  function closeInfo() {
-    infoModal.classList.remove('is-open');
-    infoModal.setAttribute('aria-hidden', 'true');
-    infoModal.setAttribute('hidden', '');
-  }
-
-  infoBtn?.addEventListener('click', (e) => {
-    e.preventDefault();
-    openInfo();
-  });
-
-  infoClose?.addEventListener('click', (e) => {
-    e.preventDefault();
-    closeInfo();
-  });
-
-  infoModal?.addEventListener('click', (e) => {
-    if (e.target === infoModal) closeInfo();
-  });
-
-  // Esc closes!
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeInfo();
-  });
-
   try {
     const html = await (async () => {
       await setIdwOverlay(ui.getSelectedK());
       const reg = await fetchRegression(ui.getSelectedK());
+      latestRegression = reg;
       return regressionHtml(reg, ui.getSelectedK());
     })();
 
@@ -385,6 +653,7 @@ map.on('load', async () => {
     ui.setStatus('done');
   } finally {
     ui.setRunEnabled(true);
+    hideLoader();
   }
 
 });
