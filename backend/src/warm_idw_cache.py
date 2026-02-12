@@ -5,9 +5,8 @@ CELL = 500
 KNN = 32
 MAX_DIM = 1400
 
-# choose step size here
+# choose step size 
 K_VALUES = [round(k, 1) for k in [x / 10 for x in range(11, 61)]]
-# -> 1.1, 1.2, ..., 6.0
 
 def main():
     print(f"Warming cache for {len(K_VALUES)} k values…")

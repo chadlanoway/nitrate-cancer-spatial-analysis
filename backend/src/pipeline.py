@@ -101,7 +101,7 @@ def ensure_idw_outputs(k: float, cell: float, knn: int, *, want_png=True, want_t
         if (not want_png or png_out.exists()) and (not want_table or csv_out.exists()) and (not want_reg or reg_out.exists()) and meta_out.exists():
             return
 
-        # build an ephemeral tif in temp
+        # build a tif in temp
         with tempfile.TemporaryDirectory() as td:
             tmp_tif = Path(td) / f"idw_tmp_k{_k_tag(k)}_cs{int(cell)}m_knn{knn}.tif"
 
@@ -126,18 +126,16 @@ def ensure_idw_outputs(k: float, cell: float, knn: int, *, want_png=True, want_t
                 "url": f"/api/idw.png?k={k}&cell={cell}&knn={knn}&max={max_dim}"
             }), encoding="utf-8")
 
-            # build tract CSV/GeoJSON if needed (point it at tmp_tif)
+            # build tract CSV/GeoJSON if needed (target tmp_tif)
             if want_table and (not csv_out.exists() or csv_out.stat().st_size == 0):
                 subprocess.check_call([
                     sys.executable, str(TABLE_SCRIPT),
                     "--k", str(k), "--cell", str(cell), "--knn", str(knn),
                     "--raster", str(tmp_tif),
                     "--out-csv", str(csv_out),
-                    # optional: also keep geojson (or remove this line if you don’t want it)
-                    # "--out-geojson", str(CACHE_TABLES / f"cancer_tracts_with_nitrate_k{_k_tag(k)}_cs{int(cell)}m_knn{knn}.geojson")
                 ])
 
-            # regression if needed (depends on CSV only)
+            # regression 
             if want_reg and (not reg_out.exists() or reg_out.stat().st_size == 0):
                 if not csv_out.exists():
                     raise FileNotFoundError(f"Missing tract CSV: {csv_out}")
