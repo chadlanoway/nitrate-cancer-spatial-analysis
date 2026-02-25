@@ -166,6 +166,21 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter, on
             })
         );
 
+        const cancerLegend = document.querySelector('[data-legend-id="cancer"]');
+        if (cancerLegend) {
+            cancerLegend.style.display = layerState.showTracts ? '' : 'none';
+        }
+
+        const nitrateLegend = document.querySelector('[data-legend-id="nitrate"]');
+        if (nitrateLegend) {
+            nitrateLegend.style.display = layerState.showNitrate ? '' : 'none';
+        }
+
+        const residualLegend = document.querySelector('[data-legend-id="residual"]');
+        if (residualLegend) {
+            residualLegend.style.display = layerState.showResidual ? '' : 'none';
+        }
+
         const tractsCb = document.getElementById('toggleTracts');
         const nitrateCb = document.getElementById('toggleNitrate');
 
