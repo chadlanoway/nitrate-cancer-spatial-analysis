@@ -9,7 +9,7 @@
  * UI-only: it does not fetch data or manipulate the map directly.
  */
 
-export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) {
+export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter, onDownloadReport }) {
     const kSlider = document.getElementById('kSlider');
     const kVal = document.getElementById('kVal');
     const runBtn = document.getElementById('runBtn');
@@ -22,20 +22,37 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) 
     const uiEl = document.getElementById('ui');
     if (!uiEl) throw new Error('Missing #ui container.');
 
-    // top-right chart link (inside the panel)
-    if (!document.getElementById('scatterLink')) {
-        const a = document.createElement('a');
-        a.id = 'scatterLink';
-        a.href = '#';
-        a.className = 'ui-scatter-link';
-        a.textContent = 'Scatter';
-        a.addEventListener('click', (e) => {
+    // top-right links (Scatter + Download)
+    if (!document.getElementById('uiTopLinks')) {
+        const box = document.createElement('div');
+        box.id = 'uiTopLinks';
+        box.className = 'ui-top-links';
+
+        const scatter = document.createElement('a');
+        scatter.id = 'scatterLink';
+        scatter.href = '#';
+        scatter.className = 'ui-scatter-link';
+        scatter.textContent = 'View Chart';
+        scatter.addEventListener('click', (e) => {
             e.preventDefault();
             onShowScatter?.();
         });
-        uiEl.appendChild(a);
-    }
 
+        const dl = document.createElement('a');
+        dl.id = 'downloadLink';
+        dl.href = '#';
+        dl.className = 'ui-download-link';
+        dl.textContent = 'Download Zip';
+        dl.addEventListener('click', (e) => {
+            e.preventDefault();
+            onDownloadReport?.();
+        });
+
+        box.appendChild(scatter);
+        box.appendChild(dl);
+
+        uiEl.appendChild(box);
+    }
     const slider = installSlidingWrapper(uiEl);
 
     let selectedK = parseFloat(kSlider.value);
@@ -43,8 +60,8 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) 
 
     // default on page load, both layers visible
     const layerState = {
-        showTracts: true,
-        showNitrate: true,
+        showTracts: false,
+        showNitrate: false,
         showResidual: true
     };
 
@@ -58,7 +75,7 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) 
 
     function renderStatsWithToggles(regressionHtml) {
         statsEl.innerHTML = `
-  ${regressionHtml}
+    ${regressionHtml}
   <hr/>
   <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
 
@@ -97,6 +114,12 @@ export function initUiPanel({ defaults, onRun, onToggleLayers, onShowScatter }) 
 
   </div>
 `;
+        const dl = document.getElementById('downloadReportLink');
+        dl?.addEventListener('click', (e) => {
+            e.preventDefault();
+            onDownloadReport?.();
+        });
+
         // cancer legend color ramp
         document.getElementById('tracts-row')?.appendChild(
             makeLegendPill({

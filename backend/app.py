@@ -13,6 +13,10 @@ This file does not do analysis logic directly.
 it orchestrates cached steps via src/pipeline.py
 """
 
+import io
+import zipfile
+from datetime import datetime, timezone
+from flask import Response
 import os
 from pyproj.datadir import get_data_dir as _pyproj_data_dir
 import pandas as pd
@@ -111,6 +115,96 @@ def api_tracts():
 
     return jsonify(tracts)
 
+@app.post("/api/report.zip")
+def api_report_zip_post():
+    q, err = _idw_params_from_query()
+    if err:
+        return err
+    k, cell, knn = q
+
+    # Ensure cached artifacts exist (like other endpoints)
+    ensure_idw_outputs(k, cell, knn, want_png=True, want_table=True, want_reg=True)
+
+    # Get uploaded png
+    f = request.files.get("scatter_png")
+    png_bytes = f.read() if f else None
+
+    # Load regression + tracts (reuse your existing paths/logic)
+    reg_path = regression_json_path(k, cell, knn)
+    reg = json.loads(Path(reg_path).read_text(encoding="utf-8"))
+
+    base_path = Path(__file__).resolve().parent / "cache" / "web" / "tracts_4326.geojson"
+    tracts = json.loads(base_path.read_text(encoding="utf-8"))
+
+    html = f"""<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Residuals report</title>
+<style>
+  body {{
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    margin: 24px;
+    background: #000;
+    color: #fff;
+  }}
+
+  h1, h2 {{
+    color: #fff;
+  }}
+
+  p {{
+    color: #ddd;
+  }}
+
+  img {{
+    max-width: 100%;
+    height: auto;
+    border: 1px solid #444;
+    border-radius: 6px;
+    margin-top: 8px;
+  }}
+
+  pre {{
+    background: #111;
+    padding: 12px;
+    border-radius: 6px;
+    overflow-x: auto;
+    color: #0f0;  /* optional: green JSON vibe */
+  }}
+</style>
+</head>
+<body>
+
+<h1>Residuals report</h1>
+<p>k={k} &nbsp; cell={int(cell)}m &nbsp; knn={knn}</p>
+
+<h2>Scatter</h2>
+{"<img src='scatter.png' alt='Scatter plot'/>" if png_bytes else "<p>(no scatter image)</p>"}
+
+<h2>Regression</h2>
+<pre>{json.dumps(reg, indent=2)}</pre>
+
+</body>
+</html>"""
+    
+    mem = io.BytesIO()
+    with zipfile.ZipFile(mem, "w", compression=zipfile.ZIP_DEFLATED) as z:
+        z.writestr("index.html", html)
+        z.writestr("regression.json", json.dumps(reg, indent=2))
+        z.writestr("tracts.geojson", json.dumps(tracts))
+        if png_bytes:
+            z.writestr("scatter.png", png_bytes)
+
+    mem.seek(0)
+    return Response(
+        mem.getvalue(),
+        mimetype="application/zip",
+        headers={
+            "Content-Disposition": "attachment; filename=report.zip",
+            "Cache-Control": "no-store",
+        },
+    )
 
 def _idw_params_from_query():
     k = float(request.args.get("k", 2.0))

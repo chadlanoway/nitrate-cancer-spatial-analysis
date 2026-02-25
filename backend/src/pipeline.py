@@ -158,7 +158,7 @@ def ensure_idw_outputs(k: float, cell: float, knn: int, *, want_png=True, want_t
 
                 mask = (data == nodata) if nodata is not None else np.zeros_like(data, dtype=bool)
 
-                vmin, vmax = 0.0, 16.0
+                vmin, vmax = 0.0, 18.0
                 t = (np.clip(data, vmin, vmax) - vmin) / (vmax - vmin + 1e-9)
 
                 r = np.zeros_like(t); g = np.zeros_like(t); b = np.zeros_like(t)

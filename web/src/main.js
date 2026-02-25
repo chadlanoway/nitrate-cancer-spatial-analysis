@@ -241,6 +241,48 @@ function hideLoader() {
 }
 showLoader();
 
+async function downloadReportZip() {
+  const k = uiRef?.getSelectedK?.() ?? DEFAULTS.k;
+  const cell = DEFAULTS.cell;
+  const knn = DEFAULTS.knn;
+
+  const blob = await renderScatterPngBlob();
+  if (!blob) throw new Error('failed to export scatter png');
+
+  const form = new FormData();
+  form.append('scatter_png', blob, 'scatter.png');
+
+  const resp = await fetch(`${API_BASE}/api/report.zip?k=${k}&cell=${cell}&knn=${knn}`, {
+    method: 'POST',
+    body: form
+  });
+  if (!resp.ok) throw new Error(`report.zip failed: ${resp.status}`);
+
+  const zipBlob = await resp.blob();
+  const url = URL.createObjectURL(zipBlob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `residuals_report_k${k.toFixed(1)}_cs${cell}m_knn${knn}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function renderScatterPngBlob() {
+  const el = ensureScatterModal();
+  const canvas = el.querySelector('#scatterCanvas');
+  if (!canvas) throw new Error('scatter canvas missing');
+
+  canvas.width = 900;
+  canvas.height = 600;
+
+  drawScatter({ skipResize: true });
+
+  return new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+}
+
 // -------- Scatter plot modal --------
 let scatterModalEl = null;
 
@@ -325,13 +367,16 @@ function getInterceptAndSlope(reg) {
   return { slope, intercept };
 }
 
-function drawScatter() {
+function drawScatter({ skipResize = false } = {}) {
   const el = ensureScatterModal();
   const canvas = el.querySelector('#scatterCanvas');
   if (!canvas) return;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width;
-  canvas.height = rect.height;
+
+  if (!skipResize) {
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
+  }
 
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
@@ -470,7 +515,8 @@ map.on('load', async () => {
         hideLoader();
       }
     },
-    onShowScatter: () => openScatter()
+    onShowScatter: () => openScatter(),
+    onDownloadReport: downloadReportZip
   });
   uiRef = ui;
 
@@ -480,7 +526,7 @@ map.on('load', async () => {
   ui.setStatus('computing…');
   const uiVis = document.getElementById('ui');
   uiVis.removeAttribute('hidden');
-  const BASE = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/'); // ensure trailing /
+  const BASE = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/');
   const pub = (p) => BASE + p.replace(/^\//, '');
 
 
@@ -565,7 +611,7 @@ map.on('load', async () => {
     }
   });
 
-  // Residual layer (hidden by default)
+  // Residual layer 
   const residuals = getNumeric(
     tracts.features.map(f => f.properties?.resid_canrate)
   );
@@ -578,11 +624,11 @@ map.on('load', async () => {
   const resBreaks = [q20, q40, q60, q80];
 
   const resColors = [
-    '#2166ac',  // strong negative
+    '#2166ac',
     '#67a9cf',
     '#f7f7f7',
     '#f4a582',
-    '#b2182b'   // strong positive
+    '#b2182b'
   ];
 
 
@@ -609,7 +655,7 @@ map.on('load', async () => {
   // hover tooltip 
   const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
 
-  map.on('mousemove', 'tracts-fill', (e) => {
+  map.on('mousemove', 'tracts-residual', (e) => {
     map.getCanvas().style.cursor = 'pointer';
     const f = e.features?.[0];
     if (!f) return;
@@ -623,16 +669,17 @@ map.on('load', async () => {
     popup
       .setLngLat(e.lngLat)
       .setHTML(`<div style="font: 12px/1.2 sans-serif">
-        <div><b>GEOID10:</b> ${geoid ?? ''}</div>
-  <div><b>Observed canrate:</b> ${Number.isFinite(canrate) ? canrate.toFixed(4) : ''}</div>
-  <div><b>Mean nitrate:</b> ${Number.isFinite(nitrate) ? nitrate.toFixed(2) : ''}</div>
-  <hr/>
-  <div><b>Predicted canrate:</b> ${Number.isFinite(pred) ? pred.toFixed(4) : ''}</div>
-  <div><b>Residual (obs-pred):</b> ${Number.isFinite(resid) ? resid.toFixed(4) : ''}</div>
-</div>`)
+      <div><b>GEOID10:</b> ${geoid ?? ''}</div>
+      <div><b>Residual (obs - pred):</b> ${Number.isFinite(resid) ? resid.toFixed(4) : ''}</div>
+      <hr/>
+      <div><b>Observed canrate:</b> ${Number.isFinite(canrate) ? canrate.toFixed(4) : ''}</div>
+      <div><b>Predicted canrate:</b> ${Number.isFinite(pred) ? pred.toFixed(4) : ''}</div>
+      <div><b>Mean nitrate:</b> ${Number.isFinite(nitrate) ? nitrate.toFixed(2) : ''}</div>
+    </div>`)
       .addTo(map);
   });
-  map.on('mouseleave', 'tracts-fill', () => {
+
+  map.on('mouseleave', 'tracts-residual', () => {
     map.getCanvas().style.cursor = '';
     popup.remove();
   });

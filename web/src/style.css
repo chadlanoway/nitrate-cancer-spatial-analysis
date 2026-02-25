@@ -537,17 +537,6 @@ a:focus {
   }
 }
 
-/* small top-right link inside ui panel */
-.ui-scatter-link {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  font: 700 11px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  letter-spacing: 0.2px;
-  opacity: 0.9;
-  text-decoration: underline;
-  cursor: pointer;
-}
 
 /* =========================
    Scatter plot modal (centered)
@@ -653,4 +642,25 @@ a:focus {
 body.modal-open {
   overflow: hidden;
   touch-action: none;
+}
+
+.ui-top-links {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 700 11px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.ui-top-links a {
+  text-decoration: underline;
+  opacity: 0.9;
+}
+
+.ui-top-links a:hover {
+  opacity: 1;
 }
