@@ -1,11 +1,5 @@
 # 🧪 Nitrate–Cancer Spatial Analysis App
 
-[![Live Demo](https://img.shields.io/badge/Demo-Live%20App-2ea44f?style=for-the-badge)](https://chadlanoway.github.io/nitrate-cancer-spatial-analysis/)
-[![Frontend](https://img.shields.io/badge/Frontend-Vite%20%2B%20MapLibre-646cff?style=for-the-badge&logo=vite)](https://vitejs.dev/)
-[![Backend](https://img.shields.io/badge/Backend-Flask-000000?style=for-the-badge&logo=flask)](https://flask.palletsprojects.com/)
-[![AWS](https://img.shields.io/badge/Deployment-AWS%20App%20Runner-ff9900?style=for-the-badge&logo=amazonaws)](https://aws.amazon.com/apprunner/)
-[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
-
 🔗 **Live Demo:**  
 https://chadlanoway.github.io/nitrate-cancer-spatial-analysis/
 
@@ -89,7 +83,7 @@ Includes:
 - S3-backed cache system
 - Deployed on AWS App Runner
 
-### AWS
+### Storage
 - S3 bucket: `cancer-nitrate-app-cache`
 - Cached artifacts:
 
@@ -182,7 +176,14 @@ frontend/
 
 backend/
   app.py
-  pipeline.py
+  src/
+    pipeline.py
+    idw_preview.py
+    load_data.py
+    make_web_tracts.py
+    regression_preview.py
+    tract_nitrate_table.py
+    warm_idw_cache.py
   cache/
 ```
 
