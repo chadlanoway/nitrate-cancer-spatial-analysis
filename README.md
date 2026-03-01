@@ -84,7 +84,7 @@ Includes:
 - Deployed on AWS App Runner
 
 ### Storage
-- S3 bucket: `cancer-nitrate-app-cache`
+- S3 bucket, or local dir
 - Cached artifacts:
 
 ```
